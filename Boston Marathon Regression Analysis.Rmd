@@ -1,0 +1,295 @@
+---
+title: "Stat 318 Final Project"
+author: "Marisa Papagelis and Peyton Wang"
+date: "11/16/2021"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+filepath <- "/Users/peyton/Desktop/College/stat318/"
+library(leaps)
+library(dplyr)
+library(MASS)
+```
+
+```{r data collection}
+df <- read.csv(file=paste(filepath, "results2017.csv", sep=""), header=TRUE)
+attach(df)
+```
+
+```{r data preparation}
+# summary(df)
+
+# remove irrelevant variables (i.e. name, bib number) or have > 15% missingness
+df = subset(df, select = -c(1,2,3,6,7,9,10,21,22,23,24,25,27,28,29))
+
+# remove one missing row for age
+df["age"] <- as.numeric(age)
+df <- df[-which(is.na(df$age)),]
+
+attach(df)
+
+# change variable name for clarifying purposes
+names(df)[names(df) == 'seconds'] <- 'final_time'
+
+# convert all times from string to seconds
+df$X5k <- as.numeric(as.difftime(X5k, units="secs"))
+df$X10k <- as.numeric(as.difftime(X10k, units="secs"))
+df$X15k <- as.numeric(as.difftime(X15k, units="secs"))
+df$X20k <- as.numeric(as.difftime(X20k, units="secs"))
+df$half <- as.numeric(as.difftime(half, units="secs"))
+df$X25k <- as.numeric(as.difftime(X25k, units="secs"))
+df$X30k <- as.numeric(as.difftime(X30k, units="secs"))
+df$X35k <- as.numeric(as.difftime(X35k, units="secs"))
+df$X40k <- as.numeric(as.difftime(X40k, units="secs"))
+df$pace <- as.numeric(as.difftime(pace, units="secs"))
+
+# regression imputation on each time
+model.impute <- lm(X5k~., data=df[,-c(2,3,14)])
+predict.time <- predict(model.impute,data.frame(df[is.na(df$X5k),-c(2,3,14)]))
+df$X5k[is.na(df$X5k)] <- predict.time
+
+model.impute <- lm(X10k~., data=df[,-c(2,3,14)])
+predict.time <- predict(model.impute,data.frame(df[is.na(df$X10k),-c(2,3,14)]))
+df$X10k[is.na(df$X10k)] <- predict.time
+
+model.impute <- lm(X15k~., data=df[,-c(2,3,14)])
+predict.time <- predict(model.impute,data.frame(df[is.na(df$X15k),-c(2,3,14)]))
+df$X15k[is.na(df$X15k)] <- predict.time
+
+model.impute <- lm(X20k~., data=df[,-c(2,3,14)])
+predict.time <- predict(model.impute,data.frame(df[is.na(df$X20k),-c(2,3,14)]))
+df$X20k[is.na(df$X20k)] <- predict.time
+
+model.impute <- lm(half~., data=df[,-c(2,3,14)])
+predict.time <- predict(model.impute,data.frame(df[is.na(df$half),-c(2,3,14)]))
+df$half[is.na(df$half)] <- predict.time
+
+model.impute <- lm(X25k~., data=df[,-c(2,3,14)])
+predict.time <- predict(model.impute,data.frame(df[is.na(df$X25k),-c(2,3,14)]))
+df$X25k[is.na(df$X25k)] <- predict.time
+
+model.impute <- lm(X30k~., data=df[,-c(2,3,14)])
+predict.time <- predict(model.impute,data.frame(df[is.na(df$X30k),-c(2,3,14)]))
+df$X30k[is.na(df$X30k)] <- predict.time
+
+model.impute <- lm(X35k~., data=df[,-c(2,3,14)])
+predict.time <- predict(model.impute,data.frame(df[is.na(df$X35k),-c(2,3,14)]))
+df$X35k[is.na(df$X35k)] <- predict.time
+
+model.impute <- lm(X40k~., data=df[,-c(2,3,14)])
+predict.time <- predict(model.impute,data.frame(df[is.na(df$X40k),-c(2,3,14)]))
+df$X40k[is.na(df$X40k)] <- predict.time
+
+model.impute <- lm(pace~., data=df[,-c(2,3,14)])
+predict.time <- predict(model.impute,data.frame(df[is.na(df$pace),-c(2,3,14)]))
+df$pace[is.na(df$pace)] <- predict.time
+
+# all remaining rows have many missing split times, so remove them all
+df <- na.omit(df)
+
+# write to a new csv
+write.csv(df, file=paste(filepath, "cleaned_data.csv", sep="")) 
+```
+
+```{r binary categorical variables}
+df <- read.csv(file=paste(filepath, "cleaned_data.csv", sep=""), header=TRUE)
+df <- df[,-1]  # drop index row
+attach(df)
+
+# boxplots of categorical variables to assess distribution
+boxplot(final_time~gender)
+boxplot(final_time~country_residence)
+
+# make gender a binary variable (female = 0, male = 1)
+df$gender[df$gender == "F"] <- 0
+df$gender[df$gender == "M"] <- 1
+df$gender <- as.numeric(df$gender)
+
+# make country residence a binary variable (USA = 0, not USA = 1)
+df$country_residence[df$country_residence != "USA"] <- 1
+df$country_residence[df$country_residence == "USA"] <- 0
+df$country_residence <- as.numeric(df$country_residence)
+attach(df)
+```
+```{r multicollinearity}
+# install.packages("car")
+library("car")
+
+model.full <- lm(final_time~.,data=df)
+vif(model.full)
+
+# removing predictors with highest VIF score > 10 one-by-one
+df <- df[-c(8)]  # drop half
+model.full <- lm(final_time~.,data=df)
+vif(model.full)
+
+df <- df[-c(11)]  # drop X40k
+model.full <- lm(final_time~.,data=df)
+vif(model.full)
+
+df <- df[-c(8)]  # drop X25k
+model.full <- lm(final_time~.,data=df)
+vif(model.full)
+
+df <- df[-c(6)]  # drop X15k
+model.full <- lm(final_time~.,data=df)
+vif(model.full)
+
+df <- df[-c(8)]  # drop X35k
+model.full <- lm(final_time~.,data=df)
+vif(model.full)
+
+df <- df[-c(5)]  # drop X10k
+model.full <- lm(final_time~.,data=df)
+vif(model.full)
+
+df <- df[-c(6)]  # drop X30k
+model.full <- lm(final_time~.,data=df)
+vif(model.full)
+
+df <- df[-c(5)]  # drop X20k
+model.full <- lm(final_time~.,data=df)
+vif(model.full)
+
+# perfect linear relationship with response and pace, so remove pace
+model.full <- lm(final_time~., data=df)
+summary(model.full)
+df <- df[-c(5)]
+
+model.full <- lm(final_time~., data=df)
+summary(model.full)
+
+attach(df)
+names(df)
+# remaining predictors: age, gender, country_residence, X5k
+```
+
+```{r all subset selection Cp}
+library(leaps)
+x <- cbind(age, gender, country_residence, X5k)
+y <- final_time
+
+result <- leaps(x, y, int=TRUE, method="Cp")
+min_Cp <- which.min(result$Cp)
+result$which[min_Cp,]
+
+# model: final_time ~ age + gender + X5k
+```
+
+```{r all subset selection R2}
+result <- leaps(x, y, method="adjr2")
+max_R2 <- which.max(result$adjr2)
+result$which[max_R2,]
+
+# model: final_time ~ age + gender + country_residence + X5k
+```
+
+```{r AIC}
+AIC <- step(model.full, direction="both", k=2, trace=0)
+AIC$call
+
+# model: final_time ~ age + gender + X5k
+
+AIC_interaction <- step(model.full, .~.^2, direction="both", k=2, trace=0)
+AIC_interaction$call
+# model: final_time ~ age + gender + country_residence + X5k + age:X5k + gender:X5k + country_residence:X5k + age:gender + gender:country_residence
+```
+
+```{r BIC}
+BIC <-step(model.full, direction="both", k=log(length(final_time)), trace=0)
+BIC$call
+
+# model: final_time ~ age + gender + X5k
+
+BIC_interaction <- step(model.full, .~.^2, direction="both", k=log(length(final_time)), trace=0)
+BIC_interaction$call
+
+# model: final_time ~ age + gender + X5k + age:X5k + gender:X5k
+```
+
+```{r fitting models}
+fit.Cp <- lm(final_time ~ age + gender + X5k)
+fit.adjr2 <- lm(final_time ~ age + gender + country_residence + X5k)
+
+fit.AIC <- lm(final_time ~ age + gender + X5k)  # same as Cp
+fit.AIC_interaction <- lm(final_time ~ age + gender + country_residence + 
+    X5k + age:X5k + gender:X5k + country_residence:X5k + age:gender + 
+    gender:country_residence)
+
+fit.BIC <- lm(final_time ~ age + gender + X5k) # same as Cp
+fit.BIC_interaction <- lm(final_time ~ age + gender + X5k + age:X5k + gender:X5k)
+```
+
+```{r model validation}
+# 5-fold cross-validation
+CV1 = CV2 = CV3 = CV4 <- 0
+n <- dim(df)[1]
+n.shuffle = sample(1:n,n,replace=FALSE)
+
+id.cv <- list()
+id.cv[[1]] <- n.shuffle[1:5275]
+id.cv[[2]] <- n.shuffle[5276:10550]
+id.cv[[3]] <- n.shuffle[10552:15825]
+id.cv[[4]] <- n.shuffle[15826:21111]
+id.cv[[5]] <- n.shuffle[21102:26377]
+
+for(i in 1:5)
+{
+  fit1 <- lm(final_time ~ age + gender + X5k, data=df[-id.cv[[i]],])
+  fit2 <- lm(final_time ~ age + gender + country_residence + X5k, data=df[-id.cv[[i]],])
+  fit3 <- lm(final_time ~ age + gender + country_residence + X5k + age:X5k + gender:X5k +
+             country_residence:X5k + age:gender + 
+             gender:country_residence, data=df[-id.cv[[i]],])
+  fit4 <- lm(final_time ~ age + gender + X5k + age:X5k + gender:X5k, data=df[-id.cv[[i]],])
+  CV1 <- CV1 + (1/n)*sum( final_time[id.cv[[i]]] - predict(fit1, df[id.cv[[i]],]) )^2
+  CV2 <- CV2 + (1/n)*sum( final_time[id.cv[[i]]] - predict(fit2, df[id.cv[[i]],]) )^2
+  CV3 <- CV3 + (1/n)*sum( final_time[id.cv[[i]]] - predict(fit3, df[id.cv[[i]],]) )^2
+  CV4 <- CV4 + (1/n)*sum( final_time[id.cv[[i]]] - predict(fit4, df[id.cv[[i]],]) )^2
+}
+
+results <- c(summary(fit.Cp)$r.squared, summary(fit.Cp)$adj.r.squared, CV1, 
+             summary(fit.adjr2)$r.squared, summary(fit.adjr2)$adj.r.squared, CV2,
+             summary(fit.AIC_interaction)$r.squared, summary(fit.AIC_interaction)$adj.r.squared, CV3,
+             summary(fit.BIC_interaction)$r.squared, summary(fit.BIC_interaction)$adj.r.squared, CV4)
+
+results_table <- matrix(results, ncol=3, nrow=4, byrow=TRUE)
+colnames(results_table) <- c('R Squared','Adjusted R Squared','CV Score')
+rownames(results_table) <- c('Model 1', 'Model 2', 'Model 3', 'Model 4')
+results_table
+
+# relatively same R^2 and adjusted R^2 values
+# best model selected by lowest CV score: model 2 (adjr2)
+# model 2: final_time ~ age + gender + country_residence + X5k
+```
+
+```{r model diagnostics}
+par(mfrow=c(2,2))
+plot(fit.Cp)
+
+# remove initial outliers/influential observations
+df <- df[-c(26368, 16711, 23009, 24626),]
+attach(df)
+
+fit.Cp.rm <- lm(final_time ~ age + gender + X5k)
+boxcox(fit.Cp.rm)  # upper bound of 95% CI close to 0, so log transformation
+
+# transformed model
+log.fit.Cp <- lm(log(final_time) ~ age + gender + X5k)
+par(mfrow=c(2,2))
+plot(log.fit.Cp)
+
+# remove more outliers/influential observations
+df <- df[-c(26355, 26212, 24200, 25949, 23127),]
+attach(df)
+
+model.final <- lm(log(final_time) ~ age + gender + X5k)
+summary(model.final)
+anova(model.final)  # model overall highly significant
+
+# R^2 = 0.784 and adjusted R^2 = 0.784
+c(summary(model.final)$r.squared, summary(model.final)$adj.r.squared)
+```
